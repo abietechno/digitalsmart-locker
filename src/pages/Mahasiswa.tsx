@@ -146,7 +146,7 @@ export default function MahasiswaPage() {
         {/* Top App Bar area style */}
         <div className="bg-emerald-600 pt-12 pb-8 px-6 text-white rounded-b-3xl shadow-md z-10 relative">
           <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold tracking-tight">SmartKampus</h1>
+            <h1 className="text-2xl font-bold tracking-tight">Bintang Lima</h1>
             <ShieldCheck className="w-8 h-8 opacity-80" />
           </div>
           <p className="text-emerald-100 text-sm font-inter">

@@ -9,9 +9,9 @@ export default function Home() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 mb-6 shadow-sm border border-emerald-200">
             <Database className="w-8 h-8" />
           </div>
-          <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">Smart Locker Digital</h1>
+          <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">Digital Locker BINTANG LIMA</h1>
           <p className="text-lg text-slate-600 font-inter max-w-2xl mx-auto">
-            Prototipe sistem penyewaan loker kampus terintegrasi Supabase Realtime tingkat demo presentasi.
+            Prototipe Digital Locker berbasis iOT-Realtime.
           </p>
         </header>
 
@@ -51,17 +51,7 @@ export default function Home() {
           </Link>
         </div>
 
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm text-sm">
-          <h3 className="font-bold text-slate-900 mb-2 flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-            Langkah Persiapan Demo (Wajib)
-          </h3>
-          <ol className="list-decimal pl-5 space-y-2 text-slate-600 font-inter">
-            <li>Buka menu Settings aplikasi ini dan isi <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">VITE_SUPABASE_URL</code> serta <code className="bg-slate-100 px-1 py-0.5 rounded text-slate-800">VITE_SUPABASE_ANON_KEY</code>.</li>
-            <li>Di project Supabase Anda, masuk ke SQL Editor dan eksekusi query pembuatan tabel. File kodenya tersedia jika Anda mengakses root direktori atau membuka file <code className="bg-slate-100 px-1 py-0.5 rounded">/supabase_setup.sql</code>.</li>
-            <li><strong>Sangat Penting:</strong> Aktifkan <i>Realtime Publication</i> untuk tabel <code className="bg-slate-100 px-1 py-0.5 rounded">lockers</code> di Supabase.</li>
-          </ol>
-        </div>
+
       </div>
     </div>
   );
