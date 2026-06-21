@@ -12,6 +12,8 @@ export default function TiketPage() {
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [adminClosedPopup, setAdminClosedPopup] = useState(false);
+  const [showConfirmPopup, setShowConfirmPopup] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<{ hours: number, minutes: number, seconds: number } | null>(null);
   const isTakingGoods = useRef(false);
 
   useEffect(() => {
@@ -75,6 +77,40 @@ export default function TiketPage() {
       supabase.removeChannel(channel);
     };
   }, [token]);
+
+  useEffect(() => {
+    if (!transaction || transaction.status !== 'ACTIVE') return;
+
+    const endTime = new Date(transaction.created_at).getTime() + (transaction.durasi_jam * 60 * 60 * 1000);
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = endTime - now;
+
+      if (diff <= 0) {
+        setTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+      } else {
+        setTimeLeft({
+          hours: Math.floor(diff / (1000 * 60 * 60)),
+          minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((diff % (1000 * 60)) / 1000)
+        });
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [transaction]);
+
+  const handleAmbilBarangClick = () => {
+    if (timeLeft && (timeLeft.hours > 0 || timeLeft.minutes > 0 || timeLeft.seconds > 0)) {
+      setShowConfirmPopup(true);
+    } else {
+      ambilBarang();
+    }
+  };
 
   const ambilBarang = async () => {
     if (!transaction) return;
@@ -147,6 +183,38 @@ export default function TiketPage() {
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6 py-12 relative overflow-hidden">
+      {showConfirmPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowConfirmPopup(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full relative z-10 text-center animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Selesai Sekarang?</h2>
+            <p className="text-slate-600 font-inter mb-6">
+              Anda yakin akan buka loker? Waktu sewa Anda masih tersisa.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={() => {
+                  setShowConfirmPopup(false);
+                  ambilBarang();
+                }}
+                className="w-full bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-600 transition"
+              >
+                Iya, Buka Locker
+              </button>
+              <button
+                onClick={() => setShowConfirmPopup(false)}
+                className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition"
+              >
+                Tidak Jadi, Kepencet
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {adminClosedPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setAdminClosedPopup(false)}></div>
@@ -212,7 +280,7 @@ export default function TiketPage() {
 
           {/* Ticket Details Segment */}
           <div className="bg-white rounded-b-3xl shadow-xl p-8 pt-10 border-b border-x border-slate-200">
-            <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-8">
+            <div className="grid grid-cols-2 gap-y-6 gap-x-4 mb-4">
               <div>
                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Penyewa</p>
                 <p className="text-slate-900 font-bold">{transaction.nama}</p>
@@ -222,7 +290,7 @@ export default function TiketPage() {
                 <p className="text-slate-900 font-bold text-2xl font-mono">{String(transaction.locker_id).padStart(2, '0')}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Durasi</p>
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-1">Paket</p>
                 <p className="text-slate-900 font-bold flex items-center gap-1"><Clock className="w-4 h-4"/> {transaction.durasi_jam} Jam</p>
               </div>
               <div>
@@ -233,9 +301,22 @@ export default function TiketPage() {
               </div>
             </div>
 
+            {transaction.status === 'ACTIVE' && (
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-8">
+                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2 text-center">Sisa Waktu</p>
+                {timeLeft ? (
+                   <p className={timeLeft.hours === 0 && timeLeft.minutes < 15 ? "text-red-600 font-bold text-3xl font-mono text-center tracking-widest" : "text-slate-900 font-bold text-3xl font-mono text-center tracking-widest"}>
+                     {String(timeLeft.hours).padStart(2, '0')}:{String(timeLeft.minutes).padStart(2, '0')}:{String(timeLeft.seconds).padStart(2, '0')}
+                   </p>
+                ) : (
+                   <p className="text-slate-400 font-bold text-3xl font-mono text-center tracking-widest">--:--:--</p>
+                )}
+              </div>
+            )}
+
             {!isCompleted ? (
               <button
-                onClick={ambilBarang}
+                onClick={handleAmbilBarangClick}
                 disabled={isProcessing}
                 className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-slate-800 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
               >
