@@ -13,3 +13,15 @@ export type Locker = {
   id: number;
   status: 'AVAILABLE' | 'IN_USE';
 };
+
+export type Transaction = {
+  id: string;
+  locker_id: number;
+  nama: string;
+  no_telp: string;
+  durasi_jam: number;
+  harga: number;
+  status: 'ACTIVE' | 'COMPLETED';
+  created_at: string;
+  token: string;
+};

@@ -92,6 +92,7 @@ export default function MahasiswaPage() {
     setIsProcessing(true);
 
     try {
+      // 1. Update locker status
       const { error } = await supabase
         .from('lockers')
         .update({ status: 'IN_USE' })
@@ -99,19 +100,47 @@ export default function MahasiswaPage() {
 
       if (error) throw error;
 
-      // Success
+      // 2. Create transaction record
+      const price = DURATIONS.find(d => d.hours === selectedDuration)?.price || 0;
+      
+      const { data: tx, error: txError } = await supabase
+        .from('transactions')
+        .insert({
+          locker_id: selectedLockerToRent,
+          nama: nama,
+          no_telp: noTelp,
+          durasi_jam: selectedDuration,
+          harga: price,
+          status: 'ACTIVE'
+        })
+        .select()
+        .single();
+        
+      if (txError) {
+        console.error("Error creating transaction", txError.message);
+        // Fallback gracefully just in case
+      }
+
+      // 3. Save session and redirect
       const sessionData = {
         id: selectedLockerToRent,
         nama,
         noTelp,
         durasiJam: selectedDuration,
-        startTime: Date.now()
+        startTime: Date.now(),
+        token: tx?.token || ''
       };
       
       localStorage.setItem('activeLockerSessionData', JSON.stringify(sessionData));
       setActiveSession(sessionData);
       setSelectedLockerToRent(null);
-      setStep('HOME'); // go back to home to show active session
+      
+      // Redirect to ticket page if token exists
+      if (tx?.token) {
+        window.location.href = `/tiket/${tx.token}`;
+      } else {
+        setStep('HOME'); // Fallback purely if transaction failed but locker update passed
+      }
     } catch (err: any) {
       alert('Gagal menyewa loker: ' + err.message);
     } finally {
@@ -147,6 +176,12 @@ export default function MahasiswaPage() {
 
   // ----- COMPONENT: Active Session View -----
   if (activeSession) {
+    if (activeSession.token) {
+      window.location.href = `/tiket/${activeSession.token}`;
+      return null;
+    }
+    
+    // Fallback if no token (legacy session)
     return (
       <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6">
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-sm w-full mx-auto border border-slate-100">

@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import LokerLaptopPage from './pages/Loker';
 import MahasiswaPage from './pages/Mahasiswa';
+import TiketPage from './pages/Tiket';
 
 export default function App() {
   return (
@@ -15,6 +16,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/loker" element={<LokerLaptopPage />} />
         <Route path="/mahasiswa" element={<MahasiswaPage />} />
+        <Route path="/tiket/:token" element={<TiketPage />} />
       </Routes>
     </BrowserRouter>
   );
