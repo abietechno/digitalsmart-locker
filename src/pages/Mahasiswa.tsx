@@ -24,6 +24,11 @@ export default function MahasiswaPage() {
   const [showLegacyConfirmPopup, setShowLegacyConfirmPopup] = useState(false);
   const [legacyTimeLeft, setLegacyTimeLeft] = useState<{ hours: number, minutes: number, seconds: number } | null>(null);
 
+  // Payment Popup State
+  const [showPaymentPopup, setShowPaymentPopup] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState('');
+  const [pendingSessionData, setPendingSessionData] = useState<any>(null);
+
   // Load active session from LocalStorage
   useEffect(() => {
     const savedSession = localStorage.getItem('activeLockerSessionData');
@@ -160,6 +165,7 @@ export default function MahasiswaPage() {
       }
 
       // 3. Generate Mayar.id Payment Link (Demo)
+      let paymentLink = null;
       try {
         const MAYAR_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiYWVhZDk0Mi02Nzc0LTRiZGUtOTQ4ZS05NzBlMzY3MTA3MWEiLCJhY2NvdW50SWQiOiI4NTU5ZTUyZC1iOTQ1LTQwOTUtOTJhYS1iY2U2YjkzZTIwMzEiLCJjcmVhdGVkQXQiOiIxNzgyMDM0NDQzMDI4Iiwicm9sZSI6ImRldmVsb3BlciIsInNjb3BlIjp7InJlYWQiOnRydWUsIndyaXRlIjp0cnVlfSwic3ViIjoiYWJpZXRlY2huby5pZEBnbWFpbC5jb20iLCJuYW1lIjoiQUJJRSBURUNITk9MT0dZIFNPTFVUSU9OUyIsImxpbmsiOiJhYmlldGVjaG5vIiwiaXNTZWxmRG9tYWluIjpudWxsLCJpYXQiOjE3ODIwMzQ0NDN9.gBYi42BpryH447SipToF7M0nd_0p44_ZGk7VPuQ18HVup68sphYxaEZR-MCEC8kEltA_d7lGQiKycksVEZwi3NpbczYM6Jfa6dYTBBY4EWcQGQlFw9Nf2_n09-eFbQRXC-3klj0tt393TDlYI1xFYdWPITHw7ysSs6ORIDsc65KhiCLpGOCRBPp_OHnIEnCPCycPQl7sLajG0yA9a7cz2kw__LFKipSo2bPaL0bBWhSc4kev-RVghDbatB4GfnkNOQf-K1idcpZBfSaioj_Hqg-xYo15TVXvpZIz_FQQugxeCuRgIjVhJeEhtw2pmAEn6i91c2hHjmKF8gysh4S8wQ";
         const response = await fetch('https://api.mayar.id/hl/v1/payment/create', {
@@ -177,38 +183,80 @@ export default function MahasiswaPage() {
         
         const mayarData = await response.json();
         if (mayarData && mayarData.data && mayarData.data.link) {
-          // Open the payment page in a new tab so they can pay
-          window.open(mayarData.data.link, '_blank');
+          paymentLink = mayarData.data.link;
         }
       } catch (mayarErr) {
         console.error("Mayar setup error:", mayarErr);
       }
 
-      // 4. Save session and redirect
       const sessionData = {
         id: selectedLockerToRent,
         nama,
         noTelp,
         durasiJam: selectedDuration,
         startTime: Date.now(),
-        token: tx?.token || ''
+        token: tx?.token || '',
+        transaction_id: tx?.id || null
       };
       
-      localStorage.setItem('activeLockerSessionData', JSON.stringify(sessionData));
-      setActiveSession(sessionData);
-      setSelectedLockerToRent(null);
-      
-      // Redirect to ticket page if token exists
-      if (tx?.token) {
-        window.location.href = `/tiket/${tx.token}`;
+      if (paymentLink) {
+        setPendingSessionData(sessionData);
+        setPaymentUrl(paymentLink);
+        setShowPaymentPopup(true);
       } else {
-        setStep('HOME'); // Fallback purely if transaction failed but locker update passed
+        localStorage.setItem('activeLockerSessionData', JSON.stringify(sessionData));
+        setActiveSession(sessionData);
+        setSelectedLockerToRent(null);
+        
+        if (tx?.token) {
+          window.location.href = `/tiket/${tx.token}`;
+        } else {
+          setStep('HOME'); // Fallback purely if transaction failed but locker update passed
+        }
       }
     } catch (err: any) {
       alert('Gagal menyewa loker: ' + err.message);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handlePaymentSuccess = () => {
+    if (pendingSessionData) {
+      const finalSession = {
+        ...pendingSessionData,
+        startTime: Date.now() // start timer from when they finish paying
+      };
+      localStorage.setItem('activeLockerSessionData', JSON.stringify(finalSession));
+      setActiveSession(finalSession);
+      setSelectedLockerToRent(null);
+      if (finalSession.token) {
+        window.location.href = `/tiket/${finalSession.token}`;
+      } else {
+        setStep('HOME');
+      }
+    }
+    setShowPaymentPopup(false);
+    setPaymentUrl('');
+    setPendingSessionData(null);
+  };
+
+  const handlePaymentCancel = async () => {
+    // Optionally revert the locker to AVAILABLE and transaction to CANCELLED
+    if (pendingSessionData) {
+      try {
+        await supabase.from('lockers').update({ status: 'AVAILABLE' }).eq('id', pendingSessionData.id);
+        if (pendingSessionData.transaction_id) {
+          await supabase.from('transactions').update({ status: 'CANCELLED' }).eq('id', pendingSessionData.transaction_id);
+        }
+      } catch (e) {
+        console.error("Error reverting payment cancel", e);
+      }
+    }
+    setShowPaymentPopup(false);
+    setPaymentUrl('');
+    setPendingSessionData(null);
+    setSelectedLockerToRent(null);
   };
 
   const selesaikanSewa = async () => {
@@ -246,80 +294,76 @@ export default function MahasiswaPage() {
     
     // Fallback if no token (legacy session)
     return (
-      <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6 relative overflow-hidden">
+      <div className="min-h-[100dvh] bg-[#F2F2F7] font-jakarta flex flex-col justify-center px-4 relative overflow-hidden">
         {showLegacyConfirmPopup && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
-            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowLegacyConfirmPopup(false)}></div>
-            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full relative z-10 text-center animate-in zoom-in-95">
-              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Clock className="w-8 h-8" />
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setShowLegacyConfirmPopup(false)}></div>
+            <div className="bg-white/90 backdrop-blur-xl rounded-[14px] w-[270px] relative z-10 text-center animate-in zoom-in-95 overflow-hidden shadow-2xl border border-black/5">
+              <div className="pt-5 px-4 pb-4">
+                <h2 className="text-[17px] font-semibold text-black mb-1">Akhiri Sewa?</h2>
+                <p className="text-[13px] text-[#3C3C43]">
+                  Waktu sewa masih tersisa. Yakin ingin membuka loker dan menyelesaikan sewa?
+                </p>
               </div>
-              <h2 className="text-xl font-bold text-slate-900 mb-2">Selesai Sekarang?</h2>
-              <p className="text-slate-600 font-inter mb-6">
-                Anda yakin akan buka loker? Waktu sewa Anda masih tersisa.
-              </p>
-              <div className="flex flex-col gap-3">
+              <div className="flex border-t border-black/10">
+                <button
+                  onClick={() => setShowLegacyConfirmPopup(false)}
+                  className="flex-1 py-[11px] text-[17px] text-[#007AFF] border-r border-black/10 active:bg-black/5 transition-colors"
+                >
+                  Batal
+                </button>
                 <button
                   onClick={() => {
                     setShowLegacyConfirmPopup(false);
                     selesaikanSewa();
                   }}
-                  className="w-full bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-600 transition"
+                  className="flex-1 py-[11px] text-[17px] text-[#FF3B30] font-semibold active:bg-black/5 transition-colors"
                 >
-                  Iya, Buka Locker
-                </button>
-                <button
-                  onClick={() => setShowLegacyConfirmPopup(false)}
-                  className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition"
-                >
-                  Tidak Jadi, Kepencet
+                  Akhiri
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-sm w-full mx-auto border border-slate-100">
-          <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle2 className="w-10 h-10" />
-          </div>
-          <h2 className="text-xl font-bold text-slate-800 mb-2">Hai, {activeSession.nama}</h2>
-          
-          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6 mx-auto w-full">
-            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2 text-center">Sisa Waktu</p>
-            {legacyTimeLeft ? (
-              <p className={legacyTimeLeft.hours === 0 && legacyTimeLeft.minutes < 15 ? "text-red-600 font-bold text-3xl font-mono text-center tracking-widest" : "text-slate-900 font-bold text-3xl font-mono text-center tracking-widest"}>
-                {String(legacyTimeLeft.hours).padStart(2, '0')}:{String(legacyTimeLeft.minutes).padStart(2, '0')}:{String(legacyTimeLeft.seconds).padStart(2, '0')}
-              </p>
-            ) : (
-              <p className="text-slate-400 font-bold text-3xl font-mono text-center tracking-widest">--:--:--</p>
-            )}
-            <p className="text-emerald-600 font-bold mt-2 text-sm flex items-center justify-center gap-1">
-              <Clock className="w-3 h-3" /> Paket: {activeSession.durasiJam} Jam
+        <div className="w-full max-w-sm mx-auto">
+          <div className="bg-white rounded-[20px] p-6 text-center shadow-sm flex flex-col items-center">
+            <div className="w-16 h-16 bg-green-100/50 rounded-full flex items-center justify-center mb-4">
+              <CheckCircle2 className="w-8 h-8 text-[#34C759]" />
+            </div>
+            <h2 className="text-[22px] font-bold text-black mb-1">Hai, {activeSession.nama}</h2>
+            
+            <p className="text-[#3C3C43] text-[15px] mb-6 font-inter">
+              Pintu loker terbuka! Silakan masukkan barang Anda dan tutup pintu rapat-rapat.
             </p>
-          </div>
 
-          <p className="text-slate-500 text-sm mb-6 font-inter">
-            Pintu loker terbuka! Silakan masukkan barang Anda dan tutup pintu rapat-rapat.
-          </p>
-          
-          <div className="bg-slate-100 rounded-xl p-6 mb-8 relative overflow-hidden">
-            <span className="text-sm font-medium text-slate-500 uppercase tracking-widest block mb-1">
-              Nomor Loker
-            </span>
-            <span className="text-5xl font-bold text-slate-900">
-              {String(activeSession.id).padStart(2, '0')}
-            </span>
-            <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500 rounded-bl-full opacity-10"></div>
-          </div>
+            <div className="w-full bg-[#F2F2F7] rounded-[14px] py-6 px-4 mb-6">
+              <span className="text-[13px] font-medium text-[#3C3C43]/60 uppercase tracking-widest block mb-2">Sisa Waktu</span>
+              {legacyTimeLeft ? (
+                <p className={cn("font-mono text-4xl mb-1 tracking-tight", legacyTimeLeft.hours === 0 && legacyTimeLeft.minutes < 15 ? "text-[#FF3B30] font-semibold" : "text-black")}>
+                  {String(legacyTimeLeft.hours).padStart(2, '0')}:{String(legacyTimeLeft.minutes).padStart(2, '0')}:{String(legacyTimeLeft.seconds).padStart(2, '0')}
+                </p>
+              ) : (
+                <p className="text-[#8E8E93] text-4xl font-mono mb-1 tracking-tight">--:--:--</p>
+              )}
+              <span className="text-[13px] text-[#3C3C43]">Paket {activeSession.durasiJam} Jam</span>
+            </div>
+            
+            <div className="w-full mb-6 relative">
+               <div className="flex justify-between items-center bg-white border border-black/5 rounded-[10px] p-4 shadow-sm">
+                 <span className="text-[17px] text-[#3C3C43]">Nomor Loker</span>
+                 <span className="text-[22px] font-bold text-black font-mono tracking-tighter">{String(activeSession.id).padStart(2, '0')}</span>
+               </div>
+            </div>
 
-          <button
-            onClick={handleLegacyAmbilSelesai}
-            disabled={isProcessing}
-            className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-slate-800 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {isProcessing ? 'Memproses...' : 'Selesai & Kunci Loker'}
-          </button>
+            <button
+              onClick={handleLegacyAmbilSelesai}
+              disabled={isProcessing}
+              className="w-full bg-[#007AFF] text-white font-semibold py-[14px] rounded-xl active:opacity-70 disabled:opacity-50 transition-opacity text-[17px] flex items-center justify-center gap-2"
+            >
+              {isProcessing ? 'Memproses...' : 'Selesai & Kunci'}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -328,33 +372,31 @@ export default function MahasiswaPage() {
   // ----- COMPONENT: Home / Scan View -----
   if (step === 'HOME') {
     return (
-      <div className="min-h-[100dvh] bg-slate-100 font-jakarta flex flex-col relative overflow-hidden">
-        {/* Top App Bar area style */}
-        <div className="bg-emerald-600 pt-12 pb-8 px-6 text-white rounded-b-3xl shadow-md z-10 relative">
-          <div className="flex justify-between items-center mb-6">
-            <h1 className="text-2xl font-bold tracking-tight">Bintang Lima</h1>
-            <ShieldCheck className="w-8 h-8 opacity-80" />
-          </div>
-          <p className="text-emerald-100 text-sm font-inter">
+      <div className="min-h-[100dvh] bg-[#F2F2F7] font-jakarta flex flex-col relative overflow-hidden">
+        <div className="px-6 pt-20 pb-6">
+          <h1 className="text-[34px] font-bold tracking-tight text-black flex items-center gap-3">
+            Bintang Lima <ShieldCheck className="w-8 h-8 text-[#007AFF]" />
+          </h1>
+          <p className="text-[#3C3C43] text-[15px] mt-2">
             Simpan barangmu dengan aman dan praktis di area kampus.
           </p>
         </div>
 
-        <div className="flex-1 px-6 pt-12 pb-8 flex flex-col justify-center relative">
-          <div className="w-full max-w-sm mx-auto">
-            <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 text-center flex flex-col items-center">
-              <div className="w-24 h-24 bg-emerald-50 rounded-2xl flex items-center justify-center mb-6 shadow-inner">
-                <QrCode className="w-12 h-12 text-emerald-600" />
+        <div className="flex-1 px-4 flex flex-col relative pb-8">
+          <div className="w-full max-w-sm mx-auto h-full flex flex-col">
+            <div className="bg-white rounded-[20px] p-6 text-center shadow-sm flex flex-col items-center border border-black/5 mt-4">
+              <div className="w-20 h-20 bg-[#007AFF]/10 rounded-full flex items-center justify-center mb-5">
+                <QrCode className="w-10 h-10 text-[#007AFF]" />
               </div>
-              <h2 className="text-xl font-bold text-slate-800 mb-2">Scan QR Loker</h2>
-              <p className="text-slate-500 text-sm mb-8 font-inter">
+              <h2 className="text-[20px] font-semibold text-black mb-2">Scan QR Loker</h2>
+              <p className="text-[#3C3C43] text-[15px] mb-8 font-inter">
                 Arahkan kamera HP kamu ke QR Code di mesin loker utama. 
-                <br/><br/>(Untuk demo, klik tombol di bawah)
+                <br/><br/><span className="text-[13px] text-[#8E8E93]">(Untuk demo, klik tombol di bawah)</span>
               </p>
               
               <button
                 onClick={handleSimulateScan}
-                className="w-full bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-600 active:scale-95 transition-all text-lg flex items-center justify-center gap-2"
+                className="w-full bg-[#007AFF] text-white font-semibold py-[14px] rounded-xl active:opacity-70 transition-opacity text-[17px] flex items-center justify-center gap-2 shadow-sm"
               >
                 <QrCode className="w-5 h-5" /> Mulai Scan
               </button>
@@ -368,55 +410,51 @@ export default function MahasiswaPage() {
   // ----- COMPONENT: Input Data View -----
   if (step === 'INPUT_DATA') {
     return (
-      <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col">
-        <header className="bg-white p-4 flex items-center gap-3 border-b border-slate-200 sticky top-0 z-20">
-          <button onClick={() => setStep('HOME')} className="p-2 -ml-2 text-slate-600 active:bg-slate-100 rounded-full transition">
-            <ArrowLeft className="w-6 h-6" />
+      <div className="min-h-[100dvh] bg-[#F2F2F7] font-jakarta flex flex-col">
+        <header className="bg-white/80 backdrop-blur-md p-4 flex items-center relative border-b border-black/5 sticky top-0 z-20">
+          <button onClick={() => setStep('HOME')} className="absolute left-4 text-[#007AFF] active:opacity-50 transition-opacity flex items-center gap-[2px]">
+            <ArrowLeft className="w-5 h-5" /> <span className="text-[17px]">Kembali</span>
           </button>
-          <span className="font-bold text-lg text-slate-800">Isi Data Diri</span>
+          <span className="font-semibold text-[17px] text-black w-full text-center">Isi Data Diri</span>
         </header>
 
-        <main className="flex-1 p-6 flex flex-col">
+        <main className="flex-1 p-4 flex flex-col">
           <form onSubmit={handleDataSubmit} className="max-w-sm mx-auto w-full flex-1 flex flex-col">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 mb-8 mt-4">
-              <p className="text-slate-500 text-sm font-inter mb-6">
-                Masukkan nama dan nomor telepon Anda untuk memulai penyewaan loker.
+            <div className="px-2 mt-2 mb-2">
+              <p className="text-[#3C3C43] text-[13px] uppercase ml-2">
+                Informasi Penyewa
               </p>
+            </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-2">
-                    <User className="w-4 h-4 text-emerald-500" /> Nama Lengkap
-                  </label>
-                  <input 
-                    type="text" 
-                    required
-                    value={nama}
-                    onChange={(e) => setNama(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-                    placeholder="Contoh: Budi Santoso"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-slate-700 mb-1.5 flex items-center gap-2">
-                    <Phone className="w-4 h-4 text-emerald-500" /> Nomor Telepon / WA
-                  </label>
-                  <input 
-                    type="tel" 
-                    required
-                    value={noTelp}
-                    onChange={(e) => setNoTelp(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition"
-                    placeholder="Contoh: 081234567890"
-                  />
-                </div>
+            <div className="bg-white rounded-[10px] overflow-hidden mb-8 shadow-sm border border-black/5">
+              <div className="p-4 border-b border-black/5 flex items-center gap-4">
+                <span className="w-[72px] text-[17px] text-black">Nama</span>
+                <input 
+                  type="text" 
+                  required
+                  value={nama}
+                  onChange={(e) => setNama(e.target.value)}
+                  className="flex-1 bg-transparent text-[17px] text-black focus:outline-none placeholder:text-[#3C3C43]/30"
+                  placeholder="Budi Santoso"
+                />
+              </div>
+              <div className="p-4 flex items-center gap-4">
+                <span className="w-[72px] text-[17px] text-black">Telepon</span>
+                <input 
+                  type="tel" 
+                  required
+                  value={noTelp}
+                  onChange={(e) => setNoTelp(e.target.value)}
+                  className="flex-1 bg-transparent text-[17px] text-black focus:outline-none placeholder:text-[#3C3C43]/30"
+                  placeholder="081234567890"
+                />
               </div>
             </div>
 
             <button
               type="submit"
               disabled={!nama.trim() || !noTelp.trim()}
-              className="mt-auto w-full bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-[0_4px_14px_0_rgba(16,185,129,0.39)] hover:bg-emerald-600 transition active:scale-95 disabled:opacity-50 disabled:shadow-none"
+              className="mt-auto mb-4 w-full bg-[#007AFF] text-white font-semibold py-[14px] rounded-xl active:opacity-70 disabled:opacity-50 transition-opacity text-[17px] shadow-sm"
             >
               Lanjutkan Pilih Loker
             </button>
@@ -428,24 +466,29 @@ export default function MahasiswaPage() {
 
   // ----- COMPONENT: Map / Choose Locker View -----
   return (
-    <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col">
-      <header className="bg-white p-4 flex items-center gap-3 border-b border-slate-200 sticky top-0 z-20">
-        <button onClick={() => setStep('INPUT_DATA')} className="p-2 -ml-2 text-slate-600 active:bg-slate-100 rounded-full transition">
-          <ArrowLeft className="w-6 h-6" />
+    <div className="min-h-[100dvh] bg-[#F2F2F7] font-jakarta flex flex-col">
+      <header className="bg-white/80 backdrop-blur-md p-4 flex items-center relative border-b border-black/5 sticky top-0 z-20">
+        <button onClick={() => setStep('INPUT_DATA')} className="absolute left-4 text-[#007AFF] active:opacity-50 transition-opacity flex items-center gap-[2px]">
+          <ArrowLeft className="w-5 h-5" /> <span className="text-[17px]">Kembali</span>
         </button>
-        <span className="font-bold text-lg text-slate-800">Pilih Loker</span>
+        <span className="font-semibold text-[17px] text-black w-full text-center">Pilih Loker</span>
       </header>
 
       <main className="flex-1 p-4 pb-24 overflow-y-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-6">
-          <div className="flex justify-between items-center mb-2">
-             <span className="text-sm font-bold text-slate-800">Status Mesin</span>
-             <span className="text-xs font-semibold px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg">ONLINE</span>
+        <div className="px-2 mb-6 mt-2 max-w-md mx-auto">
+          <div className="bg-white rounded-[10px] p-4 flex items-center justify-between shadow-sm border border-black/5">
+             <div className="flex flex-col">
+               <span className="text-[13px] text-[#3C3C43] mb-0.5">Lokasi</span>
+               <span className="text-[17px] text-black font-semibold">Loker Area Utama</span>
+             </div>
+             <span className="text-[13px] font-medium px-2 py-1 bg-[#34C759]/10 text-[#34C759] rounded-md">ONLINE</span>
           </div>
-          <p className="text-xs text-slate-500 font-inter">Pilih kotak hijau yang tersedia untuk menyimpan barangmu.</p>
         </div>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="px-2 mb-2 max-w-md mx-auto">
+            <span className="text-[13px] text-[#3C3C43] uppercase ml-2">Pilih Kotak Kosong</span>
+        </div>
+        <div className="grid grid-cols-3 gap-3 px-2 max-w-md mx-auto">
           {lockers.map((locker) => {
             const isAvailable = locker.status === 'AVAILABLE';
             return (
@@ -454,24 +497,18 @@ export default function MahasiswaPage() {
                 disabled={!isAvailable}
                 onClick={() => setSelectedLockerToRent(locker.id)}
                 className={cn(
-                  "aspect-square rounded-2xl flex flex-col items-center justify-center border-2 transition-all shadow-sm relative overflow-hidden",
+                  "aspect-square rounded-[14px] flex flex-col items-center justify-center transition-all relative overflow-hidden ring-1 ring-black/5",
                   isAvailable 
-                    ? "bg-emerald-50 border-emerald-500 text-emerald-700 active:bg-emerald-100 active:scale-95" 
-                    : "bg-slate-100 border-slate-300 text-slate-400 opacity-70 cursor-not-allowed"
+                    ? "bg-white text-black active:opacity-70 shadow-sm" 
+                    : "bg-[#E5E5EA] text-[#8E8E93] cursor-not-allowed"
                 )}
               >
-                <span className="text-2xl font-bold font-mono">
+                <span className="text-[26px] font-medium font-mono tracking-tighter">
                   {String(locker.id).padStart(2, '0')}
                 </span>
-                <span className="text-[10px] font-bold mt-1 tracking-wider uppercase">
-                  {isAvailable ? 'Pilih' : 'Penuh'}
+                <span className="text-[11px] font-medium mt-1 tracking-wide">
+                  {isAvailable ? 'Tersedia' : 'Penuh'}
                 </span>
-                
-                {/* Visual door lines */}
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex flex-col gap-[2px] opacity-20">
-                   <div className="w-[2px] h-3 bg-current rounded-full"></div>
-                   <div className="w-[2px] h-3 bg-current rounded-full"></div>
-                </div>
               </button>
             );
           })}
@@ -482,67 +519,106 @@ export default function MahasiswaPage() {
       {selectedLockerToRent !== null && (
         <div className="fixed inset-0 z-50 flex flex-col justify-end">
           <div 
-            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm transition-opacity"
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
             onClick={() => setSelectedLockerToRent(null)}
           />
-          <div className="relative bg-white rounded-t-3xl shadow-2xl p-6 min-h-[400px] animate-in slide-in-from-bottom border-t border-slate-200">
-            <button 
-              onClick={() => setSelectedLockerToRent(null)}
-              className="absolute right-4 top-4 p-2 bg-slate-100 rounded-full text-slate-500 active:scale-95 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <div className="relative bg-[#F2F2F7] md:rounded-t-[32px] rounded-t-[32px] shadow-2xl min-h-[400px] animate-in slide-in-from-bottom border-t border-white/20 pb-8 max-w-md mx-auto w-full">
+            <div className="w-10 h-1.5 bg-black/10 rounded-full mx-auto mt-3 mb-5"></div>
             
-            <div className="w-12 h-1.5 bg-slate-200 rounded-full mx-auto mb-6"></div>
-            
-            <div className="text-center mb-6">
-              <h3 className="text-2xl font-bold text-slate-900">Pembayaran Sewa</h3>
-              <p className="text-slate-500 text-sm mt-1 font-inter">Kotak Loker No. {String(selectedLockerToRent).padStart(2, '0')}</p>
+            <div className="px-6 text-center mb-6">
+              <h3 className="text-[22px] font-bold text-black">Loker {String(selectedLockerToRent).padStart(2, '0')}</h3>
+              <p className="text-[#3C3C43] text-[15px] mt-1">Pilih paket waktu penyewaan</p>
             </div>
 
-            {/* Duration Selector */}
-            <div className="mb-6">
-              <label className="block text-sm font-bold text-slate-700 mb-3">Pilih Durasi Sewa</label>
-              <div className="grid grid-cols-3 gap-2">
-                {DURATIONS.map((dur) => (
+            <div className="px-4 mb-6">
+              <div className="bg-white rounded-[10px] overflow-hidden shadow-sm border border-black/5">
+                {DURATIONS.map((dur, idx) => (
                   <button
                     key={dur.hours}
                     onClick={() => setSelectedDuration(dur.hours)}
                     className={cn(
-                      "py-3 px-2 rounded-xl border-2 text-center transition-all",
-                      selectedDuration === dur.hours
-                        ? "border-emerald-500 bg-emerald-50 text-emerald-700 font-bold"
-                        : "border-slate-200 bg-white text-slate-500 hover:border-slate-300"
+                      "w-full text-left flex justify-between items-center p-4 transition-colors",
+                      idx !== DURATIONS.length - 1 ? "border-b border-black/5" : "",
+                      selectedDuration === dur.hours ? "bg-[#007AFF]/5" : "bg-white active:bg-gray-50"
                     )}
                   >
-                    <div className="text-sm">{dur.label}</div>
+                    <span className={cn("text-[17px]", selectedDuration === dur.hours ? "text-[#007AFF] font-semibold" : "text-black")}>
+                      {dur.label}
+                    </span>
+                    {selectedDuration === dur.hours && <CheckCircle2 className="w-5 h-5 text-[#007AFF]" />}
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100 mb-8 flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-full shadow-sm flex items-center justify-center">
-                  <CreditCard className="w-5 h-5 text-indigo-500" />
-                </div>
-                <div className="text-left">
-                  <p className="text-sm font-bold text-slate-800">Total Tagihan</p>
-                  <p className="text-xs text-slate-500">QRIS / E-Wallet</p>
-                </div>
+            <div className="px-4 mb-8">
+              <div className="bg-white rounded-[10px] p-4 flex justify-between items-center shadow-sm border border-black/5">
+                 <div className="text-[17px] text-black">Total Pembayaran</div>
+                 <span className="font-semibold text-[17px] text-black">
+                   Rp{(DURATIONS.find(d => d.hours === selectedDuration)?.price || 0).toLocaleString('id-ID')}
+                 </span>
               </div>
-              <span className="font-bold text-2xl text-slate-900">
-                Rp{(DURATIONS.find(d => d.hours === selectedDuration)?.price || 0).toLocaleString('id-ID')}
-              </span>
             </div>
 
-            <button
-              onClick={processPaymentAndRent}
-              disabled={isProcessing}
-              className="w-full bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-[0_4px_14px_0_rgba(16,185,129,0.39)] hover:bg-emerald-600 transition active:scale-95 disabled:opacity-50 disabled:shadow-none flex justify-center items-center gap-2"
-            >
-              {isProcessing ? 'Memproses...' : 'Lanjut Pembayaran'}
-            </button>
+            <div className="px-4">
+              <button
+                onClick={processPaymentAndRent}
+                disabled={isProcessing}
+                className="w-full bg-[#007AFF] text-white font-semibold py-[14px] rounded-xl active:opacity-70 disabled:opacity-50 transition-opacity text-[17px] shadow-sm flex items-center justify-center"
+              >
+                {isProcessing ? 'Memproses...' : 'Lanjut Pembayaran'}
+              </button>
+              <button
+                onClick={() => setSelectedLockerToRent(null)}
+                className="w-full bg-transparent text-[#007AFF] font-semibold py-[14px] rounded-xl active:opacity-70 transition-opacity text-[17px] mt-2"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Popup Form */}
+      {showPaymentPopup && (
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end md:justify-center md:items-center">
+          <div 
+            className="absolute inset-0 bg-black/40 backdrop-blur-sm transition-opacity"
+            onClick={handlePaymentCancel}
+          />
+          <div className="relative bg-[#F2F2F7] rounded-t-[32px] md:rounded-[32px] shadow-2xl w-full md:max-w-md mx-auto h-[85vh] md:h-[700px] flex flex-col animate-in slide-in-from-bottom md:zoom-in-95 border-t border-white/20 overflow-hidden">
+            <div className="pt-3 pb-3 px-4 flex justify-between items-center bg-white/90 backdrop-blur-md z-10 shrink-0 border-b border-black/5">
+              <span className="w-8"></span> {/* Spacer for centering */}
+              <h3 className="font-semibold text-[17px] text-black">Pembayaran</h3>
+              <button 
+                onClick={handlePaymentCancel}
+                className="w-8 h-8 flex items-center justify-center bg-[#E5E5EA] rounded-full text-[#8E8E93] active:bg-[#D1D1D6] transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            <div className="flex-1 w-full relative z-0">
+              {paymentUrl ? (
+                <iframe 
+                  src={paymentUrl} 
+                  className="absolute top-0 left-0 w-full h-full border-0 bg-white" 
+                  title="Payment Gateway"
+                  allow="payment"
+                />
+              ) : (
+                <div className="flex w-full h-full items-center justify-center text-[#8E8E93] bg-[#F2F2F7]">Memuat...</div>
+              )}
+            </div>
+            
+            <div className="p-4 bg-white border-t border-black/5 shrink-0 z-10 pb-8 md:pb-4">
+              <button
+                onClick={handlePaymentSuccess}
+                className="w-full bg-[#007AFF] text-white font-semibold py-[14px] rounded-xl active:opacity-70 transition text-[17px] shadow-sm"
+              >
+                Selesai / Cek Status
+              </button>
+            </div>
           </div>
         </div>
       )}
