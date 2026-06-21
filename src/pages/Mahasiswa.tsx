@@ -4,7 +4,7 @@ import { cn } from '../lib/utils';
 import { QrCode, ArrowLeft, CheckCircle2, ShieldCheck, CreditCard, X, User, Phone, Clock } from 'lucide-react';
 
 const DURATIONS = [
-  { hours: 2, label: '2 Jam', price: 5000 },
+  { hours: 2, label: '2 Jam', price: 2000 },
   { hours: 6, label: '6 Jam', price: 10000 },
   { hours: 24, label: '1 Hari', price: 20000 },
 ];
@@ -372,18 +372,64 @@ export default function MahasiswaPage() {
   // ----- COMPONENT: Home / Scan View -----
   if (step === 'HOME') {
     return (
-      <div className="min-h-[100dvh] bg-[#F2F2F7] font-jakarta flex flex-col relative overflow-hidden">
-        <div className="pt-16 pb-6 flex justify-center px-6">
-          <img src="/logo.png" alt="LockerPintar Logo" className="h-24 object-contain" />
+      <div className="h-[100dvh] bg-[#F2F2F7] font-jakarta flex flex-col relative overflow-hidden">
+        <div className="pt-16 pb-6 flex justify-center px-6 shrink-0 bg-[#F2F2F7] z-10 shadow-sm border-b border-black/5">
+          <img src="/logo.png" alt="LockerPintar Logo" className="h-[40px] max-h-16 object-contain" />
         </div>
 
-        <div className="flex-1 px-4 flex flex-col relative pb-8">
-          <div className="w-full max-w-sm mx-auto h-full flex flex-col">
-            <div className="bg-white rounded-[20px] p-6 text-center shadow-sm flex flex-col items-center border border-black/5 mt-4">
+        <div className="flex-1 overflow-x-auto snap-x snap-mandatory flex flex-row no-scrollbar relative w-full">
+          {/* Slide 1 */}
+          <div className="h-full w-full snap-center snap-always shrink-0 flex items-center justify-center p-6 relative">
+            <div className="max-w-sm w-full bg-white rounded-[24px] p-8 shadow-sm border border-black/5 text-center flex flex-col items-center">
+               <div className="w-16 h-16 bg-[#007AFF]/10 rounded-full flex items-center justify-center mb-6">
+                 <ShieldCheck className="w-8 h-8 text-[#007AFF]" />
+               </div>
+               <h2 className="text-[22px] font-bold text-black mb-3 leading-tight">Apa itu LockerPintar?</h2>
+               <p className="text-[#3C3C43] text-[15px] leading-relaxed font-inter">
+                 LockerPintar adalah penyimpanan loker pintar berbasis digital anda dapat menyimpan barang-barang anda saat beraktivitas/olahraga secara aman dan praktis. kini simpan barang tidak perlu kuatir lagi.
+               </p>
+               <div className="mt-10 text-[#8E8E93] text-[13px] flex items-center animate-pulse">
+                  <span>Geser ke samping</span>
+                  <div className="w-6 h-[1.5px] bg-[#8E8E93]/80 ml-2 rounded-full"></div>
+               </div>
+            </div>
+          </div>
+
+          {/* Slide 2 */}
+          <div className="h-full w-full snap-center snap-always shrink-0 flex items-center justify-center p-6 relative">
+            <div className="max-w-sm w-full bg-white rounded-[24px] p-6 shadow-sm border border-black/5 flex flex-col items-center">
+               <div className="w-16 h-16 bg-[#34C759]/10 rounded-full flex items-center justify-center mb-5 shrink-0">
+                 <Clock className="w-8 h-8 text-[#34C759]" />
+               </div>
+               <h2 className="text-[22px] font-bold text-black mb-6">Pilihan Paket Sewa</h2>
+               <div className="w-full flex flex-col gap-3">
+                 <div className="flex justify-between items-center p-4 bg-[#F2F2F7] rounded-[14px]">
+                   <span className="font-semibold text-black text-[15px]">Paket 2 Jam</span>
+                   <span className="text-[#007AFF] font-bold text-[17px]">Rp 2.000</span>
+                 </div>
+                 <div className="flex justify-between items-center p-4 bg-[#F2F2F7] rounded-[14px]">
+                   <span className="font-semibold text-black text-[15px]">Paket 6 Jam</span>
+                   <span className="text-[#007AFF] font-bold text-[17px]">Rp 10.000</span>
+                 </div>
+                 <div className="flex justify-between items-center p-4 bg-[#F2F2F7] rounded-[14px]">
+                   <span className="font-semibold text-black text-[15px]">Paket 1 Hari</span>
+                   <span className="text-[#007AFF] font-bold text-[17px]">Rp 20.000</span>
+                 </div>
+               </div>
+               <div className="mt-8 text-[#8E8E93] text-[13px] flex items-center animate-pulse">
+                  <span>Geser ke samping</span>
+                  <div className="w-6 h-[1.5px] bg-[#8E8E93]/80 ml-2 rounded-full"></div>
+               </div>
+            </div>
+          </div>
+
+          {/* Slide 3 */}
+          <div className="h-full w-full snap-center snap-always shrink-0 flex items-center justify-center p-6 relative">
+            <div className="max-w-sm w-full bg-white rounded-[24px] p-8 shadow-sm border border-black/5 text-center flex flex-col items-center">
               <div className="w-20 h-20 bg-[#007AFF]/10 rounded-full flex items-center justify-center mb-6">
                 <QrCode className="w-10 h-10 text-[#007AFF]" />
               </div>
-              <h2 className="text-[22px] font-bold text-black mb-8 tracking-tight">Cek Locker</h2>
+              <h2 className="text-[22px] font-bold text-black mb-8 tracking-tight">Mulai Sewa Loker</h2>
               
               <button
                 onClick={handleSimulateScan}
