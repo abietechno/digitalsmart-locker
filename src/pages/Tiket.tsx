@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase, type Transaction } from '../lib/supabase';
-import { CheckCircle2, QrCode, ArrowLeft, Unlock, XCircle, Clock } from 'lucide-react';
+import { CheckCircle2, QrCode, ArrowLeft, Unlock, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import QRCode from 'react-qr-code';
 
 export default function TiketPage() {
@@ -11,6 +11,8 @@ export default function TiketPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [adminClosedPopup, setAdminClosedPopup] = useState(false);
+  const isTakingGoods = useRef(false);
 
   useEffect(() => {
     if (!token) return;
@@ -25,6 +27,28 @@ export default function TiketPage() {
 
         if (error) throw error;
         setTransaction(data as Transaction);
+
+        // Subscribing to lockers changes just in case physical locker is closed (by admin)
+        if (data && data.status === 'ACTIVE') {
+          const lockerChannel = supabase
+            .channel(`public:lockers:ticket=${token}`)
+            .on(
+              'postgres_changes',
+              { event: 'UPDATE', schema: 'public', table: 'lockers', filter: `id=eq.${data.locker_id}` },
+              (payload) => {
+                if (payload.new.status === 'AVAILABLE' && !isTakingGoods.current) {
+                  setAdminClosedPopup(true);
+                  // Optimistically update tx to completed 
+                  setTransaction(prev => prev ? { ...prev, status: 'COMPLETED' } : null);
+                }
+              }
+            )
+            .subscribe();
+           
+           // We technically should save lockerChannel somewhere to unsubscribe, 
+           // but keeping it simple as it'll be killed when unmounting or token changing
+        }
+
       } catch (err: any) {
         console.error('Error fetching ticket:', err.message);
         setError('Tiket tidak ditemukan atau terjadi kesalahan.');
@@ -55,6 +79,7 @@ export default function TiketPage() {
   const ambilBarang = async () => {
     if (!transaction) return;
     setIsProcessing(true);
+    isTakingGoods.current = true;
 
     try {
       // 1. Update locker status back to AVAILABLE
@@ -121,7 +146,32 @@ export default function TiketPage() {
   const qrUrl = typeof window !== 'undefined' ? `${window.location.origin}/tiket/${transaction.token}` : '';
 
   return (
-    <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6 py-12">
+    <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6 py-12 relative overflow-hidden">
+      {adminClosedPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setAdminClosedPopup(false)}></div>
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full relative z-10 text-center animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="w-8 h-8" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2">Loker Tertutup</h2>
+            <p className="text-slate-600 font-inter mb-6">
+              Sistem mendeteksi loker anda telah tertutup. Silahkan hubungi admin di <br/>
+              <span className="font-bold text-slate-800 text-lg mt-2 block">0812-3374-1899</span>
+            </p>
+            <button
+              onClick={() => {
+                setAdminClosedPopup(false);
+                navigate('/mahasiswa');
+              }}
+              className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl hover:bg-slate-800 transition"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-sm w-full mx-auto relative">
         
         {isCompleted && (

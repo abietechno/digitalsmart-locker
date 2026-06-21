@@ -81,6 +81,13 @@ export default function LokerLaptopPage() {
         setLockers((prev) =>
           prev.map((l) => (l.id === id ? { ...l, status: 'IN_USE' } : l))
         );
+      } else {
+        // Automatically complete any active transaction associated with this locker
+        await supabase
+          .from('transactions')
+          .update({ status: 'COMPLETED' })
+          .eq('locker_id', id)
+          .eq('status', 'ACTIVE');
       }
     } catch (err) {
       console.error(err);
