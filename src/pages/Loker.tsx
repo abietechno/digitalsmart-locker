@@ -106,9 +106,12 @@ export default function LokerLaptopPage() {
     <div className="min-h-screen bg-slate-50 flex flex-col font-jakarta">
       {/* Header */}
       <header className="bg-white border-b border-slate-200 px-8 py-4 shadow-sm flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Digital Locker BINTANG LIMA</h1>
-          <p className="text-sm text-slate-500 font-inter mt-1">Sistem Pemantauan Digital Kampus</p>
+        <div className="flex items-center gap-4">
+          <img src="/logo.png" alt="LockerPintar Logo" className="h-10" />
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Digital Locker BINTANG LIMA</h1>
+            <p className="text-sm text-slate-500 font-inter mt-1">Sistem Pemantauan Digital Kampus</p>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">

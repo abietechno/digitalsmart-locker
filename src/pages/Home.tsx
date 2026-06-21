@@ -5,10 +5,8 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 font-jakarta flex flex-col items-center justify-center p-6 sm:p-12">
       <div className="max-w-3xl w-full">
-        <header className="mb-12 text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-600 mb-6 shadow-sm border border-emerald-200">
-            <Database className="w-8 h-8" />
-          </div>
+        <header className="mb-12 text-center flex flex-col items-center">
+          <img src="/logo.png" alt="LockerPintar" className="h-20 mb-6" />
           <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">Digital Locker BINTANG LIMA</h1>
           <p className="text-lg text-slate-600 font-inter max-w-2xl mx-auto">
             Prototipe Digital Locker berbasis iOT-Realtime.

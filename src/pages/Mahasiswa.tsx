@@ -373,32 +373,23 @@ export default function MahasiswaPage() {
   if (step === 'HOME') {
     return (
       <div className="min-h-[100dvh] bg-[#F2F2F7] font-jakarta flex flex-col relative overflow-hidden">
-        <div className="px-6 pt-20 pb-6">
-          <h1 className="text-[34px] font-bold tracking-tight text-black flex items-center gap-3">
-            Bintang Lima <ShieldCheck className="w-8 h-8 text-[#007AFF]" />
-          </h1>
-          <p className="text-[#3C3C43] text-[15px] mt-2">
-            Simpan barangmu dengan aman dan praktis di area kampus.
-          </p>
+        <div className="pt-16 pb-6 flex justify-center px-6">
+          <img src="/logo.png" alt="LockerPintar Logo" className="h-24 object-contain" />
         </div>
 
         <div className="flex-1 px-4 flex flex-col relative pb-8">
           <div className="w-full max-w-sm mx-auto h-full flex flex-col">
             <div className="bg-white rounded-[20px] p-6 text-center shadow-sm flex flex-col items-center border border-black/5 mt-4">
-              <div className="w-20 h-20 bg-[#007AFF]/10 rounded-full flex items-center justify-center mb-5">
+              <div className="w-20 h-20 bg-[#007AFF]/10 rounded-full flex items-center justify-center mb-6">
                 <QrCode className="w-10 h-10 text-[#007AFF]" />
               </div>
-              <h2 className="text-[20px] font-semibold text-black mb-2">Scan QR Loker</h2>
-              <p className="text-[#3C3C43] text-[15px] mb-8 font-inter">
-                Arahkan kamera HP kamu ke QR Code di mesin loker utama. 
-                <br/><br/><span className="text-[13px] text-[#8E8E93]">(Untuk demo, klik tombol di bawah)</span>
-              </p>
+              <h2 className="text-[22px] font-bold text-black mb-8 tracking-tight">Cek Locker</h2>
               
               <button
                 onClick={handleSimulateScan}
                 className="w-full bg-[#007AFF] text-white font-semibold py-[14px] rounded-xl active:opacity-70 transition-opacity text-[17px] flex items-center justify-center gap-2 shadow-sm"
               >
-                <QrCode className="w-5 h-5" /> Mulai Scan
+                Cek Locker Sekarang
               </button>
             </div>
           </div>

@@ -183,6 +183,10 @@ export default function TiketPage() {
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6 py-12 relative overflow-hidden">
+      <div className="absolute top-0 left-0 w-full pt-8 flex justify-center">
+        <img src="/logo.png" alt="LockerPintar Logo" className="h-16 object-contain" />
+      </div>
+
       {showConfirmPopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowConfirmPopup(false)}></div>
