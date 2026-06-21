@@ -21,12 +21,16 @@ export default function MahasiswaPage() {
   const [noTelp, setNoTelp] = useState('');
   const [selectedDuration, setSelectedDuration] = useState<number>(2);
 
+  const [showLegacyConfirmPopup, setShowLegacyConfirmPopup] = useState(false);
+  const [legacyTimeLeft, setLegacyTimeLeft] = useState<{ hours: number, minutes: number, seconds: number } | null>(null);
+
   // Load active session from LocalStorage
   useEffect(() => {
     const savedSession = localStorage.getItem('activeLockerSessionData');
     if (savedSession) {
       try {
-        setActiveSession(JSON.parse(savedSession));
+        const parsed = JSON.parse(savedSession);
+        setActiveSession(parsed);
       } catch (e) {
         console.error(e);
       }
@@ -34,10 +38,45 @@ export default function MahasiswaPage() {
       // Backward compatibility with previous version
       const oldId = localStorage.getItem('activeLockerSession');
       if (oldId) {
-        setActiveSession({ id: parseInt(oldId, 10), nama: 'Mahasiswa', durasiJam: 2, startTime: Date.now() });
+        setActiveSession({ id: parseInt(oldId, 10), nama: 'Mahasiswa', durasiJam: 2, startTime: Date.now(), token: '' });
       }
     }
   }, []);
+
+  // Timer for legacy session view
+  useEffect(() => {
+    if (!activeSession || activeSession.token) return;
+
+    const endTime = activeSession.startTime + (activeSession.durasiJam * 60 * 60 * 1000);
+
+    const updateTimer = () => {
+      const now = Date.now();
+      const diff = endTime - now;
+
+      if (diff <= 0) {
+        setLegacyTimeLeft({ hours: 0, minutes: 0, seconds: 0 });
+      } else {
+        setLegacyTimeLeft({
+          hours: Math.floor(diff / (1000 * 60 * 60)),
+          minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((diff % (1000 * 60)) / 1000)
+        });
+      }
+    };
+
+    updateTimer();
+    const interval = setInterval(updateTimer, 1000);
+
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
+  const handleLegacyAmbilSelesai = () => {
+    if (legacyTimeLeft && (legacyTimeLeft.hours > 0 || legacyTimeLeft.minutes > 0 || legacyTimeLeft.seconds > 0)) {
+      setShowLegacyConfirmPopup(true);
+    } else {
+      selesaikanSewa();
+    }
+  };
 
   // Fetch lockers and subscribe when not in HOME view or if we have an active session
   useEffect(() => {
@@ -183,15 +222,59 @@ export default function MahasiswaPage() {
     
     // Fallback if no token (legacy session)
     return (
-      <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6">
+      <div className="min-h-[100dvh] bg-slate-50 font-jakarta flex flex-col justify-center px-6 relative overflow-hidden">
+        {showLegacyConfirmPopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center px-6">
+            <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setShowLegacyConfirmPopup(false)}></div>
+            <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full relative z-10 text-center animate-in zoom-in-95">
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Clock className="w-8 h-8" />
+              </div>
+              <h2 className="text-xl font-bold text-slate-900 mb-2">Selesai Sekarang?</h2>
+              <p className="text-slate-600 font-inter mb-6">
+                Anda yakin akan buka loker? Waktu sewa Anda masih tersisa.
+              </p>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setShowLegacyConfirmPopup(false);
+                    selesaikanSewa();
+                  }}
+                  className="w-full bg-emerald-500 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-emerald-600 transition"
+                >
+                  Iya, Buka Locker
+                </button>
+                <button
+                  onClick={() => setShowLegacyConfirmPopup(false)}
+                  className="w-full bg-slate-100 text-slate-700 font-bold py-4 rounded-xl hover:bg-slate-200 transition"
+                >
+                  Tidak Jadi, Kepencet
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl shadow-xl p-8 text-center max-w-sm w-full mx-auto border border-slate-100">
           <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6">
             <CheckCircle2 className="w-10 h-10" />
           </div>
           <h2 className="text-xl font-bold text-slate-800 mb-2">Hai, {activeSession.nama}</h2>
-          <p className="text-emerald-600 font-bold mb-4 flex items-center justify-center gap-1">
-            <Clock className="w-4 h-4" /> Durasi: {activeSession.durasiJam} Jam
-          </p>
+          
+          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6 mx-auto w-full">
+            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider mb-2 text-center">Sisa Waktu</p>
+            {legacyTimeLeft ? (
+              <p className={legacyTimeLeft.hours === 0 && legacyTimeLeft.minutes < 15 ? "text-red-600 font-bold text-3xl font-mono text-center tracking-widest" : "text-slate-900 font-bold text-3xl font-mono text-center tracking-widest"}>
+                {String(legacyTimeLeft.hours).padStart(2, '0')}:{String(legacyTimeLeft.minutes).padStart(2, '0')}:{String(legacyTimeLeft.seconds).padStart(2, '0')}
+              </p>
+            ) : (
+              <p className="text-slate-400 font-bold text-3xl font-mono text-center tracking-widest">--:--:--</p>
+            )}
+            <p className="text-emerald-600 font-bold mt-2 text-sm flex items-center justify-center gap-1">
+              <Clock className="w-3 h-3" /> Paket: {activeSession.durasiJam} Jam
+            </p>
+          </div>
+
           <p className="text-slate-500 text-sm mb-6 font-inter">
             Pintu loker terbuka! Silakan masukkan barang Anda dan tutup pintu rapat-rapat.
           </p>
@@ -207,7 +290,7 @@ export default function MahasiswaPage() {
           </div>
 
           <button
-            onClick={selesaikanSewa}
+            onClick={handleLegacyAmbilSelesai}
             disabled={isProcessing}
             className="w-full bg-slate-900 text-white font-bold py-4 rounded-xl shadow-lg hover:bg-slate-800 transition active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
           >
