@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { ArrowLeft, Users, Activity, BarChart3, Clock, CheckCircle2, LayoutDashboard } from 'lucide-react';
+import { ArrowLeft, Users, Activity, BarChart3, Clock, LayoutDashboard, PieChart as PieChartIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell, PieChart, Pie, Legend } from 'recharts';
 import { format, subDays, startOfDay, endOfDay } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -22,34 +21,59 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchTransactions();
-    
-    const channel = supabase
-      .channel('public:transactions')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, () => {
-        fetchTransactions();
-      })
-      .subscribe();
-      
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    // Simulate loading for effect
+    setTimeout(() => {
+      setTransactions(generateDummyTransactions());
+      setLoading(false);
+    }, 500);
   }, []);
 
-  const fetchTransactions = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
-      setTransactions(data || []);
-    } catch (err) {
-      console.error('Error fetching transactions:', err);
-    } finally {
-      setLoading(false);
+  const generateDummyTransactions = () => {
+    const dummy: Transaction[] = [];
+    const names = ['Andi', 'Budi', 'Citra', 'Dewi', 'Eka', 'Fajar', 'Gita', 'Hadi', 'Iwan', 'Joko', 'Kiki', 'Lina', 'Maya', 'Nisa', 'Oki', 'Putri'];
+    const todayDate = new Date();
+    
+    // Add today's transactions
+    for (let i = 0; i < 5; i++) {
+      dummy.push({
+        id: `dummy-today-${i}`,
+        locker_id: Math.floor(Math.random() * 15) + 1,
+        nama: names[Math.floor(Math.random() * names.length)],
+        no_telp: `0812${Math.floor(Math.random() * 10000000)}`,
+        durasi_jam: [2, 6, 24][Math.floor(Math.random() * 3)],
+        harga: 0, // will set below
+        status: i < 3 ? 'ACTIVE' : 'COMPLETED',
+        created_at: new Date(todayDate.getTime() - i * 3600000).toISOString(),
+      });
     }
+
+    // Add past 30 days for monthly stats
+    for (let d = 1; d <= 30; d++) {
+      const pastDate = new Date(todayDate.getTime() - d * 86400000);
+      const numTx = Math.floor(Math.random() * 8) + 2; // 2 to 9 transactions per day
+      for (let i = 0; i < numTx; i++) {
+        dummy.push({
+          id: `dummy-past-${d}-${i}`,
+          locker_id: Math.floor(Math.random() * 15) + 1,
+          nama: names[Math.floor(Math.random() * names.length)],
+          no_telp: `0812${Math.floor(Math.random() * 10000000)}`,
+          durasi_jam: [2, 6, 24][Math.floor(Math.random() * 3)],
+          harga: 0,
+          status: 'COMPLETED',
+          created_at: new Date(pastDate.getTime() - Math.random() * 86400000).toISOString(),
+        });
+      }
+    }
+
+    // fix prices
+    dummy.forEach(t => {
+      if (t.durasi_jam === 2) t.harga = 2000;
+      if (t.durasi_jam === 6) t.harga = 10000;
+      if (t.durasi_jam === 24) t.harga = 20000;
+    });
+
+    // sort newest first
+    return dummy.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   };
 
   if (loading) {
@@ -96,6 +120,41 @@ export default function Dashboard() {
   });
 
   const highestUsageDay = [...weeklyStats].sort((a, b) => b.count - a.count)[0];
+
+  // Monthly stats (Pie Charts)
+  const monthStart = startOfDay(subDays(today, 30));
+  const monthlyTransactions = transactions.filter(t => {
+    const date = new Date(t.created_at);
+    return date >= monthStart && date <= todayEnd;
+  });
+
+  const pieLockerStatus = [
+    { name: 'Disewa', value: activeRentals, color: '#FF9500' },
+    { name: 'Tersedia', value: 15 - activeRentals, color: '#34C759' }
+  ];
+
+  const piePaket = [
+    { name: '2 Jam', value: monthlyTransactions.filter(t => t.durasi_jam === 2).length, color: '#007AFF' },
+    { name: '6 Jam', value: monthlyTransactions.filter(t => t.durasi_jam === 6).length, color: '#5856D6' },
+    { name: '1 Hari', value: monthlyTransactions.filter(t => t.durasi_jam === 24).length, color: '#FF2D55' }
+  ];
+
+  const userCounts: Record<string, number> = {};
+  monthlyTransactions.forEach(t => {
+    userCounts[t.no_telp] = (userCounts[t.no_telp] || 0) + 1;
+  });
+  
+  let newUsers = 0;
+  let returningUsers = 0;
+  Object.values(userCounts).forEach(count => {
+    if (count === 1) newUsers++;
+    else returningUsers++;
+  });
+
+  const pieUser = [
+    { name: 'Sewa 1 Kali', value: newUsers, color: '#32ADE6' },
+    { name: 'Sewa >1 Kali', value: returningUsers, color: '#FF3B30' }
+  ];
 
   return (
     <div className="min-h-screen bg-[#F2F2F7] font-jakarta pb-12">
@@ -222,6 +281,108 @@ export default function Dashboard() {
                   <p className="text-sm">Belum ada transaksi hari ini</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* Monthly Stats Pie Charts */}
+        <div className="bg-white rounded-[20px] p-6 shadow-sm border border-black/5 mt-6">
+          <div className="mb-6">
+            <h2 className="text-lg font-bold text-black flex items-center gap-2 mb-1">
+              <PieChartIcon className="w-5 h-5 text-[#FF2D55]" /> Statistik Bulanan (30 Hari)
+            </h2>
+            <p className="text-[#8E8E93] text-sm">Sebaran data penggunaan dalam 30 hari terakhir</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* Pie 1: Status Loker */}
+            <div className="flex flex-col items-center">
+              <h3 className="text-[15px] font-semibold text-[#3C3C43] mb-4">Status Loker Saat Ini</h3>
+              <div className="h-[200px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieLockerStatus}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {pieLockerStatus.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}
+                      itemStyle={{ color: 'black', fontWeight: 'bold' }}
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Pie 2: Jenis Paket */}
+            <div className="flex flex-col items-center">
+              <h3 className="text-[15px] font-semibold text-[#3C3C43] mb-4">Pilihan Paket Sewa</h3>
+              <div className="h-[200px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={piePaket}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {piePaket.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}
+                      itemStyle={{ color: 'black', fontWeight: 'bold' }}
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            {/* Pie 3: User */}
+            <div className="flex flex-col items-center">
+              <h3 className="text-[15px] font-semibold text-[#3C3C43] mb-4">Aktivitas User (Sewa)</h3>
+              <div className="h-[200px] w-full relative">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieUser}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={5}
+                      dataKey="value"
+                      stroke="none"
+                    >
+                      {pieUser.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip 
+                      contentStyle={{ borderRadius: '12px', border: '1px solid rgba(0,0,0,0.05)', boxShadow: '0 4px 6px rgba(0,0,0,0.05)' }}
+                      itemStyle={{ color: 'black', fontWeight: 'bold' }}
+                    />
+                    <Legend verticalAlign="bottom" height={36} iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '13px', paddingTop: '10px' }} />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
         </div>
