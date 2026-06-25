@@ -26,7 +26,6 @@ export default function MahasiswaPage() {
 
   // Payment Popup State
   const [showPaymentPopup, setShowPaymentPopup] = useState(false);
-  const [paymentUrl, setPaymentUrl] = useState('');
   const [pendingSessionData, setPendingSessionData] = useState<any>(null);
 
   // Load active session from LocalStorage
@@ -164,31 +163,7 @@ export default function MahasiswaPage() {
         console.error("Error creating transaction", txError.message);
       }
 
-      // 3. Generate Mayar.id Payment Link (Demo)
-      let paymentLink = null;
-      try {
-        const MAYAR_TOKEN = "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiJiYWVhZDk0Mi02Nzc0LTRiZGUtOTQ4ZS05NzBlMzY3MTA3MWEiLCJhY2NvdW50SWQiOiI4NTU5ZTUyZC1iOTQ1LTQwOTUtOTJhYS1iY2U2YjkzZTIwMzEiLCJjcmVhdGVkQXQiOiIxNzgyMDM0NDQzMDI4Iiwicm9sZSI6ImRldmVsb3BlciIsInNjb3BlIjp7InJlYWQiOnRydWUsIndyaXRlIjp0cnVlfSwic3ViIjoiYWJpZXRlY2huby5pZEBnbWFpbC5jb20iLCJuYW1lIjoiQUJJRSBURUNITk9MT0dZIFNPTFVUSU9OUyIsImxpbmsiOiJhYmlldGVjaG5vIiwiaXNTZWxmRG9tYWluIjpudWxsLCJpYXQiOjE3ODIwMzQ0NDN9.gBYi42BpryH447SipToF7M0nd_0p44_ZGk7VPuQ18HVup68sphYxaEZR-MCEC8kEltA_d7lGQiKycksVEZwi3NpbczYM6Jfa6dYTBBY4EWcQGQlFw9Nf2_n09-eFbQRXC-3klj0tt393TDlYI1xFYdWPITHw7ysSs6ORIDsc65KhiCLpGOCRBPp_OHnIEnCPCycPQl7sLajG0yA9a7cz2kw__LFKipSo2bPaL0bBWhSc4kev-RVghDbatB4GfnkNOQf-K1idcpZBfSaioj_Hqg-xYo15TVXvpZIz_FQQugxeCuRgIjVhJeEhtw2pmAEn6i91c2hHjmKF8gysh4S8wQ";
-        const response = await fetch('https://api.mayar.id/hl/v1/payment/create', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${MAYAR_TOKEN}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            name: `Loker ${String(selectedLockerToRent).padStart(2, '0')} - Bintang Lima`,
-            amount: price,
-            description: `Sewa loker untuk ${nama} (${selectedDuration} Jam)`
-          })
-        });
-        
-        const mayarData = await response.json();
-        if (mayarData && mayarData.data && mayarData.data.link) {
-          paymentLink = mayarData.data.link;
-        }
-      } catch (mayarErr) {
-        console.error("Mayar setup error:", mayarErr);
-      }
-
+      // 3. Show Payment Mockup
       const sessionData = {
         id: selectedLockerToRent,
         nama,
@@ -199,21 +174,9 @@ export default function MahasiswaPage() {
         transaction_id: tx?.id || null
       };
       
-      if (paymentLink) {
-        setPendingSessionData(sessionData);
-        setPaymentUrl(paymentLink);
-        setShowPaymentPopup(true);
-      } else {
-        localStorage.setItem('activeLockerSessionData', JSON.stringify(sessionData));
-        setActiveSession(sessionData);
-        setSelectedLockerToRent(null);
-        
-        if (tx?.token) {
-          window.location.href = `/tiket/${tx.token}`;
-        } else {
-          setStep('HOME'); // Fallback purely if transaction failed but locker update passed
-        }
-      }
+      setPendingSessionData(sessionData);
+      setShowPaymentPopup(true);
+      
     } catch (err: any) {
       alert('Gagal menyewa loker: ' + err.message);
     } finally {
@@ -237,7 +200,6 @@ export default function MahasiswaPage() {
       }
     }
     setShowPaymentPopup(false);
-    setPaymentUrl('');
     setPendingSessionData(null);
   };
 
@@ -254,7 +216,6 @@ export default function MahasiswaPage() {
       }
     }
     setShowPaymentPopup(false);
-    setPaymentUrl('');
     setPendingSessionData(null);
     setSelectedLockerToRent(null);
   };
@@ -635,17 +596,22 @@ export default function MahasiswaPage() {
               </button>
             </div>
             
-            <div className="flex-1 w-full relative z-0">
-              {paymentUrl ? (
-                <iframe 
-                  src={paymentUrl} 
-                  className="absolute top-0 left-0 w-full h-full border-0 bg-white" 
-                  title="Payment Gateway"
-                  allow="payment"
-                />
-              ) : (
-                <div className="flex w-full h-full items-center justify-center text-[#8E8E93] bg-[#F2F2F7]">Memuat...</div>
-              )}
+            <div className="flex-1 w-full relative z-0 p-6 flex flex-col items-center overflow-y-auto">
+              <div className="bg-white p-6 rounded-[24px] shadow-sm border border-black/5 w-full flex flex-col items-center text-center">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/a/a2/Logo_QRIS.svg/1200px-Logo_QRIS.svg.png" alt="QRIS Logo" className="h-8 mb-4" />
+                <h4 className="text-[15px] text-[#3C3C43] mb-1">BPU UNESA</h4>
+                <p className="text-[20px] font-bold text-black mb-6">
+                  Rp {(DURATIONS.find(d => d.hours === pendingSessionData?.durasiJam)?.price || 0).toLocaleString('id-ID')}
+                </p>
+                
+                <div className="bg-white border-2 border-black/5 p-4 rounded-2xl mb-6 shadow-sm">
+                  <QrCode className="w-48 h-48 text-black" />
+                </div>
+                
+                <p className="text-[13px] text-[#8E8E93] max-w-[250px] mx-auto leading-relaxed">
+                  Scan QRIS di atas menggunakan aplikasi mobile banking atau e-wallet Anda. (MOCKUP DEMO)
+                </p>
+              </div>
             </div>
             
             <div className="p-4 bg-white border-t border-black/5 shrink-0 z-10 pb-8 md:pb-4">

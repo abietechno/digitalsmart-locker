@@ -4,7 +4,7 @@ import { Laptop, Smartphone, Database, ArrowRight } from 'lucide-react';
 export default function Home() {
   return (
     <div className="min-h-screen bg-slate-50 font-jakarta flex flex-col items-center justify-center p-6 sm:p-12">
-      <div className="max-w-3xl w-full">
+      <div className="max-w-5xl w-full">
         <header className="mb-12 text-center flex flex-col items-center">
           <img src="/logo.png" alt="LockerPintar" className="h-20 mb-6" />
           <h1 className="text-4xl font-bold text-slate-900 tracking-tight mb-4">Digital Locker BINTANG LIMA</h1>
@@ -13,7 +13,24 @@ export default function Home() {
           </p>
         </header>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-12">
+        <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {/* Card Admin Dashboard */}
+          <Link 
+            to="/dashboard"
+            className="group block bg-white p-8 rounded-3xl shadow-lg border border-slate-200 hover:border-emerald-500 hover:shadow-xl transition-all"
+          >
+            <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center mb-6 group-hover:bg-emerald-50 transition-colors">
+              <Database className="w-6 h-6 text-slate-700 group-hover:text-emerald-600" />
+            </div>
+            <h2 className="text-xl font-bold text-slate-900 mb-2 flex items-center justify-between">
+              Admin Dashboard
+              <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 transition-colors transform group-hover:translate-x-1" />
+            </h2>
+            <p className="text-slate-500 text-sm font-inter">
+              (Tampilan Admin) Lihat riwayat transaksi log harian, pendapatan, dan statistik penggunaan mingguan loker.
+            </p>
+          </Link>
+
           {/* Card Laptop */}
           <Link 
             to="/loker"
